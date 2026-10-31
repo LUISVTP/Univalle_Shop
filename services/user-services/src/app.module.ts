@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { UserModule } from './user/user.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -15,6 +17,18 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       appSecret: process.env.OBSERVE_APP_SECRET ?? 'YOUR_APP_SECRET',
       serviceId: 'univalle-shop-api',
     }),
+    MongooseModule.forRootAsync({
+      useFactory: () => {
+        const uri = process.env.MONGODB_URI;
+
+        if (!uri) {
+          throw new Error('MONGODB_URI is not defined');
+        }
+
+        return { uri };
+      },
+    }),
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],
