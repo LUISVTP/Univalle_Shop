@@ -1,0 +1,70 @@
+name: univalleshop
+services:
+  users-mongo:
+    image: mongo:8.0
+    volumes: [users-data:/data/db]
+    networks: [users-db]
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "quit(db.adminCommand('ping').ok ? 0 : 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  catalog-mongo:
+    image: mongo:8.0
+    volumes: [catalog-data:/data/db]
+    networks: [catalog-db]
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "quit(db.adminCommand('ping').ok ? 0 : 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  users:
+    build: ./services/user-services
+    environment:
+      PORT: 3000
+      MONGODB_URI: mongodb://users-mongo:27017/users
+      ALLOWED_EMAIL_DOMAIN: ${ALLOWED_EMAIL_DOMAIN:-correounivalle.edu.co}
+    networks: [backend, users-db]
+    depends_on:
+      users-mongo: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+  catalog:
+    build: ./services/catalog-service
+    environment:
+      PORT: 3000
+      MONGODB_URI: mongodb://catalog-mongo:27017/catalog
+    networks: [backend, catalog-db]
+    depends_on:
+      catalog-mongo: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+  gateway:
+    build: ./services/api-gateway
+    ports: ["127.0.0.1:3000:3000"]
+    environment:
+      PORT: 3000
+      USERS_SERVICE_URL: http://users:3000
+      CATALOG_SERVICE_URL: http://catalog:3000
+    networks: [backend]
+    depends_on:
+      users: { condition: service_healthy }
+      catalog: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 10
+volumes:
+  users-data:
+  catalog-data:
+networks:
+  backend:
+  users-db: { internal: true }
+  catalog-db: { internal: true }

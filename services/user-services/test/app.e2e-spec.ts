@@ -1,29 +1,71 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import 'reflect-metadata';
+import { Test } from '@nestjs/testing';
+import { APP_FILTER } from '@nestjs/core';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types.js';
-import { AppModule } from './../src/app.module.js';
+import { UserController } from '../src/user/infrastructure/http/user.controller.js';
+import { UserErrorFilter } from '../src/user/infrastructure/http/user-error.filter.js';
+import { CreateUserUseCase } from '../src/user/application/use-cases/create-user.use-case.js';
+import { EmailAlreadyExists } from '../src/user/domain/errors.js';
+import { ScryptPasswordHasher } from '../src/user/infrastructure/adapter/scrypt-password-hasher.js';
 
-describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
-
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+describe('Users HTTP con puerto de persistencia sustituido', () => {
+  let app: INestApplication;
+  const save = vi.fn(async (user) => ({ ...user, id: 'test-id' }));
+  beforeAll(async () => {
+    const module = await Test.createTestingModule({
+      controllers: [UserController],
+      providers: [
+        { provide: APP_FILTER, useClass: UserErrorFilter },
+        {
+          provide: CreateUserUseCase,
+          useFactory: () =>
+            new CreateUserUseCase(
+              { SaveUser: save },
+              new ScryptPasswordHasher(),
+              'correounivalle.edu.co',
+            ),
+        },
+      ],
     }).compile();
-
-    app = moduleFixture.createNestApplication();
+    app = module.createNestApplication();
     await app.init();
   });
-
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+  afterAll(async () => {
+    await app?.close();
   });
-
-  afterEach(async () => {
-    await app.close();
+  it('POST /users devuelve 201 sin hash ni contraseña', async () => {
+    const result = await request(app.getHttpServer())
+      .post('/users')
+      .send({
+        name: 'Ana',
+        email: 'ana@correounivalle.edu.co',
+        password: 'ClaveLarga123!',
+      })
+      .expect(201);
+    expect(result.body).toEqual({
+      id: 'test-id',
+      name: 'Ana',
+      email: 'ana@correounivalle.edu.co',
+    });
+  });
+  it('POST /users devuelve 400 por correo externo', async () => {
+    await request(app.getHttpServer())
+      .post('/users')
+      .send({ name: 'Ana', email: 'ana@gmail.com', password: 'ClaveLarga123!' })
+      .expect(400);
+  });
+  it('POST /users devuelve 409 por duplicado', async () => {
+    save.mockRejectedValueOnce(
+      new EmailAlreadyExists('El correo ya está registrado'),
+    );
+    await request(app.getHttpServer())
+      .post('/users')
+      .send({
+        name: 'Ana',
+        email: 'ana@correounivalle.edu.co',
+        password: 'ClaveLarga123!',
+      })
+      .expect(409);
   });
 });

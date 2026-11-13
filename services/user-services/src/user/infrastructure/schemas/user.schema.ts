@@ -6,11 +6,11 @@ export class UserDocument {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, unique: true })
   email: string;
 
-  @Prop({ required: true })
-  password: string;
+  @Prop({ required: true, select: false })
+  passwordHash: string;
 
   createdAt?: Date;
 }
