@@ -16,7 +16,7 @@ function npm(args, cwd) {
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
-for (const service of ['user-services', 'catalog-service', 'api-gateway']) {
+for (const service of ['user-services', 'catalog-service', 'orders-service', 'api-gateway']) {
   const cwd = resolve(root, 'services', service);
   console.log(`\nChecking ${service}`);
   if (process.argv.includes('--install')) npm(['ci'], cwd);

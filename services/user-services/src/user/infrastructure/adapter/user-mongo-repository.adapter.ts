@@ -1,3 +1,4 @@
+import { UserReader } from '../../domain/port/user-reader.js';
 import { Injectable } from '@nestjs/common';
 import type { OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -9,7 +10,7 @@ import { UserDocument, UserHydratedDocument } from '../schemas/user.schema.js';
 
 @Injectable()
 export class UserMongoRepositoryAdapter
-  implements UserRepository, OnModuleInit
+  implements UserRepository, UserReader, OnModuleInit
 {
   constructor(
     @InjectModel(UserDocument.name)
@@ -18,6 +19,22 @@ export class UserMongoRepositoryAdapter
 
   async onModuleInit(): Promise<void> {
     await this.userModel.init();
+  }
+
+  async findById(id: string) {
+    const user = await this.userModel
+      .findById(id)
+      .select('name email createdAt')
+      .lean()
+      .exec();
+    return user
+      ? {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          createdAt: user.createdAt,
+        }
+      : null;
   }
 
   async SaveUser(user: User): Promise<User> {

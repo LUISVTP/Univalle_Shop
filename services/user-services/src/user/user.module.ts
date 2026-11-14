@@ -1,3 +1,6 @@
+import { UserReader } from './domain/port/user-reader.js';
+import { GetUserUseCase } from './application/use-cases/get-user.use-case.js';
+import { UserQueryController } from './infrastructure/http/user-query.controller.js';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CreateUserUseCase } from './application/use-cases/create-user.use-case.js';
@@ -19,8 +22,14 @@ import {
       { name: UserDocument.name, schema: UserSchema },
     ]),
   ],
-  controllers: [UserController],
+  controllers: [UserController, UserQueryController],
   providers: [
+    { provide: UserReader, useExisting: UserRepository },
+    {
+      provide: GetUserUseCase,
+      useFactory: (r: UserReader) => new GetUserUseCase(r),
+      inject: [UserReader],
+    },
     { provide: APP_FILTER, useClass: UserErrorFilter },
     { provide: PasswordHasher, useClass: ScryptPasswordHasher },
     {
