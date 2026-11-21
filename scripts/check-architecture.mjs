@@ -11,7 +11,7 @@ function* files(dir) {
     else if (item.name.endsWith('.ts') && !item.name.endsWith('.spec.ts')) yield path;
   }
 }
-for (const name of ['user-services', 'catalog-service', 'orders-service', 'api-gateway']) {
+for (const name of ['user-services', 'catalog-service', 'orders-service', 'payments-service', 'search-service', 'recommendations-service', 'api-gateway']) {
   const source = resolve(root, name, 'src');
   for (const path of files(source)) {
     const inner = relative(source, path).split(/[\\/]/).some(part => part === 'domain' || part === 'application');

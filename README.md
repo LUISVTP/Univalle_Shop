@@ -1,64 +1,59 @@
-> **Ampliación Entrega 1 (13/11/2026):** se incorporó pedidos demostrativos con Aggregator, Chained, CQRS, Event Sourcing, outbox y transportes Kafka/RabbitMQ. Consulta [la guía actualizada](docs/ENTREGA-1-PATRONES.md) y [la verificación](docs/VERIFICACION-PATRONES.md). Las secciones inferiores conservan la descripción de la base inicial. No incluye frontend ni pagos.
+# UnivalleShop
 
-# UnivalleShop — primer avance
+Tienda universitaria de demostración para Desarrollo de Software 3: **seis microservicios NestJS, API Gateway, MongoDB independiente por servicio y frontend React con TypeScript**. Capas de dominio, aplicación e infraestructura, puertos y adaptadores.
 
-Base de microservicios REST con NestJS, TypeScript, MongoDB y arquitectura hexagonal. Conserva y completa el servicio de usuarios original; añade catálogo mínimo y API Gateway. No incluye todavía frontend React ni el e-commerce completo.
+| Aplicación | Funcionalidad disponible |
+| --- | --- |
+| `services/user-services` | Registro con correo institucional, hash de contraseña y consulta de perfil. |
+| `services/catalog-service` | Crear, listar y consultar productos; consumidor de actividad de pedidos. |
+| `services/orders-service` | Crear/cancelar pedidos, historial de eventos y reconstrucción de vistas CQRS. |
+| `services/payments-service` | Pagos **simulados**, importe obtenido de pedidos e idempotencia por pedido. |
+| `services/search-service` | Índice Mongo propio, búsqueda sin distinción de acentos y filtro de precio. |
+| `services/recommendations-service` | Intereses persistidos y sugerencias con razones explicables. |
+| `services/api-gateway` | Entrada REST `/api`, enrutamiento y agregación del resumen de pedidos. |
+| `frontend` | React: catálogo, búsqueda, publicación, perfil de demo, recomendaciones, carrito y comprobantes locales. |
 
-```text
-services/
-  user-services/       # registro, hash y Mongo exclusivo
-  catalog-service/     # crear/listar productos y Mongo exclusivo
-  api-gateway/         # entrada pública REST, sin base de datos
-scripts/               # arquitectura, verificación e integración real
-docs/                  # diagnóstico, explicación y demostración
-compose.yaml           # tres aplicaciones y dos MongoDB
+## Probar localmente
+
+Con Node.js 24 y npm, desde la raíz:
+
+```powershell
+node scripts/verify.mjs --install
+node scripts/full-stack.mjs --smoke
+node scripts/full-stack.mjs
 ```
 
-Cada servicio tiene su propio manifiesto, lockfile, configuración y Dockerfile. No importa código ni modelos de otro servicio.
+El último comando mantiene una demo en **http://127.0.0.1:3207** y Gateway en http://127.0.0.1:3200. Crea productos y seis MongoDB temporales; imprime el ID del perfil de prueba. Recupera ese ID en Mi perfil o registra otro usuario. Ctrl+C detiene los procesos y elimina las bases temporales. El carrito y los comprobantes se guardan solo en este navegador.
 
-## Ejecutar con Docker
+La demo local permite comprobar React y los seis servicios sin broker: pedidos conserva el outbox pendiente y la interfaz consulta los eventos. Para comprobar el circuito asíncrono completo se necesita Kafka o RabbitMQ, según la guía de patrones.
 
-Requiere Docker Engine/Desktop activo con Compose v2 y contenedores Linux.
+## Docker Compose
 
-```sh
+```powershell
 docker compose config
-docker compose up --build -d --wait
+docker compose up --build -d
 docker compose ps
 ```
 
-Entrada: `http://localhost:3000`. Solo se publica el Gateway en la interfaz local. Mongo no publica puertos. Esta configuración es de desarrollo, con bases sin autenticación aisladas en redes internas.
+Frontend http://localhost:8080; Gateway http://localhost:3000. El stack declara 15 contenedores: seis servicios, seis MongoDB, Gateway, Kafka y frontend/Nginx. Cada base tiene volumen y red propios. No se exponen los puertos de MongoDB.
 
-| Método | Ruta pública | Resultado |
-| --- | --- | --- |
-| GET | `/health` | Salud del proceso Gateway |
-| POST | `/api/users` | Registro: 201; datos inválidos: 400; correo duplicado: 409 |
-| POST | `/api/products` | Crear producto: 201; datos inválidos: 400 |
-| GET | `/api/products` | Lista de hasta 100 productos: 200 |
+**Pendiente validar Docker real:** en el equipo de desarrollo no hay motor Docker disponible. Los archivos preparados y la ejecución directa con MongoDB no sustituyen construir y arrancar las imágenes.
 
-Entrada de registro: `name`, `email`, `password` (12 a 128 caracteres). Dominio permitido configurable mediante `ALLOWED_EMAIL_DOMAIN`; por defecto `correounivalle.edu.co`. Esto valida el formato institucional, no acredita pertenencia ni implementa autenticación.
+La alternativa RabbitMQ está en `compose.rabbitmq.yaml`. Ejecuta `node scripts/create-rabbit-env.mjs` para generar credenciales locales ignoradas por Git; sigue la guía antes de usar el override. No subas archivos `.env`.
 
-Entrada de producto: `name`, `price` positivo y `stock` entero no negativo.
+## Documentación y demostración
 
-## Compilar y probar sin Docker
+- [Seis servicios y React: instalación, código explicado, recorrido y límites](docs/SEIS-SERVICIOS-Y-REACT.md).
+- [Verificación de esta ampliación](docs/VERIFICACION-SEIS-SERVICIOS.md).
+- [Postman: recorrido por los seis servicios](postman/UnivalleShop-seis-servicios.postman_collection.json).
+- [Patrones del primer avance: Aggregator, Chained, CQRS, Event Sourcing, Outbox, Kafka y RabbitMQ](docs/ENTREGA-1-PATRONES.md).
+- [Pruebas históricas de patrones](docs/VERIFICACION-PATRONES.md).
+- [Guía de arquitectura hexagonal](docs/GUIA-ARQUITECTURA.md) y [diagnóstico inicial](docs/DIAGNOSTICO.md).
 
-Node 24 o superior, npm y acceso de red para la instalación. Ejecución local comprobada con Node 26.5.0 y npm 11.17.0.
+`scripts/verify.mjs` comprueba las siete aplicaciones backend y React. `.github/workflows/verify.yml` ejecuta compilación, tipos y pruebas en pushes/pull requests; los resultados de GitHub deben consultarse después de su ejecución.
 
-```sh
-node scripts/verify.mjs --install
-node scripts/integration.mjs
-```
+## Alcance y pendientes
 
-El primer comando instala cada proyecto con `npm ci`, comprueba dependencias arquitectónicas, compila, comprueba tipos, ejecuta pruebas y lint. Sin `--install` reutiliza las dependencias instaladas.
+Los pagos no cobran dinero ni reciben tarjetas. La recuperación del perfil por ID no autentica al usuario: faltan login, verificación de correo, roles y autorización. El carrito es local, crea un pedido por producto y no reserva inventario. Faltan historial completo por usuario, categorías/imágenes, gestión completa de perfiles y una saga que coordine pago, cancelación e inventario. React es una aplicación modular única, sin composición de microfrontends independientes.
 
-El segundo lanza dos MongoDB temporales reales y tres aplicaciones compiladas. La primera vez descarga el binario MongoDB (en Windows aproximadamente 756 MB); no requiere una base instalada, no usa una base existente y elimina los datos de prueba al terminar. Comprueba también independencia ante caídas y reinicio de catálogo.
-
-Para ejecutar servicios manualmente, instala/compila cada uno, copia su `.env.example` a `.env`, ajusta sus URLs y ejecuta `npm run start:dev`. Los ejemplos esperan Mongo usuarios en `127.0.0.1:27017` y catálogo en `127.0.0.1:27018`: debes proporcionar esas instancias. El Compose principal no expone esos puertos. Los puertos HTTP locales de ejemplo son 3001, 3002 y 3000 respectivamente.
-
-## Material de estudio y evidencia
-
-- [Diagnóstico del código original](docs/DIAGNOSTICO.md).
-- [Guía de carpetas, métodos, puertos, DI, SOLID y recorrido HTTP → Mongo](docs/GUIA-ARQUITECTURA.md).
-- [Demostración para la sustentación](docs/DEMOSTRACION.md).
-- [Resultados y límites de la verificación](docs/VERIFICACION.md).
-
-No se hizo push. No hay secretos en los ejemplos. Las llaves de Observe son opcionales y deben mantenerse fuera de Git. El cambio de `password` a `passwordHash` requiere migración/restablecimiento si ya existen usuarios almacenados; no conectes una base anterior sin revisarlo.
+Búsqueda sincroniza bajo demanda cada 30 segundos hasta 100 productos del catálogo actual; recomendaciones utiliza coincidencias de palabras. Las guías señalan los límites y lo necesario para evolucionar estas implementaciones. También siguen pendientes SDD, evidencias de Jira y continuidad semanal de los avances reales de cada microservicio.

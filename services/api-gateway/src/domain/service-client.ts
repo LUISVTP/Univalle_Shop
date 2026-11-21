@@ -1,4 +1,5 @@
-export type Service = 'users' | 'catalog' | 'orders';
+export type Service =
+  'users' | 'catalog' | 'orders' | 'payments' | 'search' | 'recommendations';
 export interface ServiceResponse {
   status: number;
   body: unknown;

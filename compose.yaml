@@ -99,6 +99,90 @@ services:
       interval: 10s
       timeout: 8s
       retries: 20
+  payments-mongo:
+    image: mongo:8.0
+    volumes: [payments-data:/data/db]
+    networks: [payments-db]
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "quit(db.adminCommand('ping').ok ? 0 : 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  payments:
+    build: ./services/payments-service
+    environment:
+      PORT: 3000
+      MONGODB_URI: mongodb://payments-mongo:27017/payments
+      USERS_SERVICE_URL: http://users:3000
+      CATALOG_SERVICE_URL: http://catalog:3000
+      ORDERS_SERVICE_URL: http://orders:3000
+      SIMULATED_PAYMENT_OUTCOME: approved
+    networks: [backend, payments-db]
+    depends_on:
+      payments-mongo: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+  search-mongo:
+    image: mongo:8.0
+    volumes: [search-data:/data/db]
+    networks: [search-db]
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "quit(db.adminCommand('ping').ok ? 0 : 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  search:
+    build: ./services/search-service
+    environment:
+      PORT: 3000
+      MONGODB_URI: mongodb://search-mongo:27017/search
+      USERS_SERVICE_URL: http://users:3000
+      CATALOG_SERVICE_URL: http://catalog:3000
+      ORDERS_SERVICE_URL: http://orders:3000
+      SIMULATED_PAYMENT_OUTCOME: approved
+    networks: [backend, search-db]
+    depends_on:
+      search-mongo: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+  recommendations-mongo:
+    image: mongo:8.0
+    volumes: [recommendations-data:/data/db]
+    networks: [recommendations-db]
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "quit(db.adminCommand('ping').ok ? 0 : 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  recommendations:
+    build: ./services/recommendations-service
+    environment:
+      PORT: 3000
+      MONGODB_URI: mongodb://recommendations-mongo:27017/recommendations
+      USERS_SERVICE_URL: http://users:3000
+      CATALOG_SERVICE_URL: http://catalog:3000
+      ORDERS_SERVICE_URL: http://orders:3000
+      SIMULATED_PAYMENT_OUTCOME: approved
+    networks: [backend, recommendations-db]
+    depends_on:
+      recommendations-mongo: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+  frontend:
+    build: ./frontend
+    ports: ["127.0.0.1:8080:80"]
+    networks: [backend]
+    depends_on:
+      gateway: { condition: service_healthy }
   gateway:
     build: ./services/api-gateway
     ports: ["127.0.0.1:3000:3000"]
@@ -107,6 +191,9 @@ services:
       USERS_SERVICE_URL: http://users:3000
       CATALOG_SERVICE_URL: http://catalog:3000
       ORDERS_SERVICE_URL: http://orders:3000
+      PAYMENTS_SERVICE_URL: http://payments:3000
+      SEARCH_SERVICE_URL: http://search:3000
+      RECOMMENDATIONS_SERVICE_URL: http://recommendations:3000
     networks: [backend]
     depends_on:
       users: { condition: service_healthy }
@@ -118,6 +205,9 @@ services:
       timeout: 4s
       retries: 10
 volumes:
+  payments-data:
+  search-data:
+  recommendations-data:
   users-data:
   catalog-data:
   orders-data:
@@ -127,3 +217,6 @@ networks:
   users-db: { internal: true }
   catalog-db: { internal: true }
   orders-db: { internal: true }
+  payments-db: { internal: true }
+  search-db: { internal: true }
+  recommendations-db: { internal: true }

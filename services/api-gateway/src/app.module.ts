@@ -16,6 +16,10 @@ import { GatewayController } from './infrastructure/gateway.controller.js';
       provide: ServiceClient,
       useFactory: () =>
         new HttpServiceClient({
+          payments: process.env.PAYMENTS_SERVICE_URL ?? 'http://127.0.0.1:3004',
+          search: process.env.SEARCH_SERVICE_URL ?? 'http://127.0.0.1:3005',
+          recommendations:
+            process.env.RECOMMENDATIONS_SERVICE_URL ?? 'http://127.0.0.1:3006',
           orders: process.env.ORDERS_SERVICE_URL ?? 'http://127.0.0.1:3003',
           users: process.env.USERS_SERVICE_URL ?? 'http://127.0.0.1:3001',
           catalog: process.env.CATALOG_SERVICE_URL ?? 'http://127.0.0.1:3002',

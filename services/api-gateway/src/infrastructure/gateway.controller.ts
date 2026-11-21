@@ -5,6 +5,7 @@ import {
   Inject,
   Post,
   Param,
+  Query,
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
@@ -121,6 +122,62 @@ export class GatewayController {
         .status(status)
         .json({ statusCode: status, message: error.message });
     }
+  }
+
+  @Post('api/payments') pay(@Body() body: unknown, @Res() res: Response) {
+    return this.send('payments', 'POST', '/payments', res, body);
+  }
+  @Get('api/payments/:id') payment(
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    return this.send(
+      'payments',
+      'GET',
+      `/payments/${encodeURIComponent(id)}`,
+      res,
+    );
+  }
+  @Get('api/search') search(
+    @Query('q') q: string | undefined,
+    @Query('maxPrice') maxPrice: string | undefined,
+    @Res() res: Response,
+  ) {
+    if (
+      (q !== undefined && typeof q !== 'string') ||
+      (maxPrice !== undefined && typeof maxPrice !== 'string')
+    )
+      return res
+        .status(400)
+        .json({ message: 'Parámetros de búsqueda inválidos' });
+    const params = new URLSearchParams();
+    if (q !== undefined) params.set('q', q);
+    if (maxPrice !== undefined) params.set('maxPrice', maxPrice);
+    return this.send('search', 'GET', `/search?${params}`, res);
+  }
+  @Get('api/recommendations/:userId') recommendations(
+    @Param('userId') id: string,
+    @Res() res: Response,
+  ) {
+    return this.send(
+      'recommendations',
+      'GET',
+      `/recommendations/${encodeURIComponent(id)}`,
+      res,
+    );
+  }
+  @Post('api/recommendations/:userId/preferences') preferences(
+    @Param('userId') id: string,
+    @Body() body: unknown,
+    @Res() res: Response,
+  ) {
+    return this.send(
+      'recommendations',
+      'POST',
+      `/recommendations/${encodeURIComponent(id)}/preferences`,
+      res,
+      body,
+    );
   }
   private async send(
     service: Service,
