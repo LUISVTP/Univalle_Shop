@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api, money } from './api';
 import type { Product, Profile, Order, Payment } from './api';
 import { addToCart, cartTotal, load } from './cart';
 import type { CartLine } from './cart';
-import { ProductCard, ProfileForm, PublishForm } from './components';
+import { Icon, ProductCard, ProfileForm, PublishForm } from './components';
+import { FeaturedGallery } from './FeaturedGallery';
+import { CartFeedback, flightToCart } from './CartFeedback';
+import type { CartNotice } from './CartFeedback';
 type Receipt = { order: Order; payment?: Payment };
 type Tab = 'catalog' | 'orders' | 'profile' | 'publish';
 export default function App() {
@@ -27,6 +30,18 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
+  const [cartNotice, setCartNotice] = useState<CartNotice | null>(null);
+  const cartTarget = useRef<HTMLSpanElement>(null);
+  const noticeId = useRef(0);
+  const added = cartNotice?.kind === 'added' ? cartNotice : null;
+  useEffect(() => {
+    if (!cartNotice) return;
+    const timer = window.setTimeout(
+      () => setCartNotice(null),
+      cartNotice.kind === 'added' ? 3000 : 6000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [cartNotice]);
   useEffect(() => {
     localStorage.setItem('uv-profile', JSON.stringify(profile));
   }, [profile]);
@@ -97,12 +112,26 @@ export default function App() {
       setLoading(false);
     }
   }
-  function add(product: Product) {
+  function add(product: Product, source: HTMLButtonElement) {
+    const id = ++noticeId.current;
+    setMessage('');
     try {
-      setCart(addToCart(cart, product));
-      setMessage(`${product.name} agregado a tu carrito.`);
+      const next = addToCart(cart, product);
+      if (next === cart) return;
+      const quantity = next.find(
+        (line) => line.product.id === product.id,
+      )!.quantity;
+      setCart(next);
+      setCartNotice({
+        id,
+        kind: 'added',
+        productId: product.id,
+        name: product.name,
+        quantity,
+        flight: flightToCart(source, cartTarget.current),
+      });
     } catch (e) {
-      setMessage((e as Error).message);
+      setCartNotice({ id, kind: 'error', message: (e as Error).message });
     }
   }
   function remember(order: Order, payment?: Payment) {
@@ -230,9 +259,7 @@ export default function App() {
           onClick={() => setTab('catalog')}
           aria-label="UnivalleShop inicio"
         >
-          <span className="brand-mark">
-            U<span>v</span>
-          </span>
+          <img className="brand-mark" src="/univalle-mark.svg" alt="" />
           <span>
             Univalle<span className="brand-light">Shop</span>
             <small>EL MERCADO DE NUESTRA COMUNIDAD</small>
@@ -241,23 +268,37 @@ export default function App() {
         <nav aria-label="Navegación principal">
           {(
             [
-              ['catalog', 'Explorar'],
-              ['orders', 'Mis pedidos'],
-              ['profile', profile?.name.split(' ')[0] ?? 'Mi perfil'],
-              ['publish', 'Publicar'],
-            ] as [Tab, string][]
-          ).map(([key, label]) => (
+              ['catalog', 'Explorar', 'grid'],
+              ['orders', 'Mis pedidos', 'receipt'],
+              ['profile', profile?.name.split(' ')[0] ?? 'Mi perfil', 'user'],
+              ['publish', 'Publicar', 'plus'],
+            ] as [Tab, string, 'grid' | 'receipt' | 'user' | 'plus'][]
+          ).map(([key, label, icon]) => (
             <button
               key={key}
               className={tab === key ? 'active' : ''}
               onClick={() => setTab(key)}
             >
+              <Icon name={icon} />
               {label}
             </button>
           ))}
         </nav>
-        <button className="cart-button" onClick={() => setDrawer(true)}>
-          Carrito <span>{count}</span>
+        <button
+          className="cart-button"
+          onClick={() => {
+            setCartNotice(null);
+            setDrawer(true);
+          }}
+        >
+          <Icon name="bag" /> Carrito{' '}
+          <span
+            key={added?.id ?? 'idle'}
+            ref={cartTarget}
+            className={added ? 'cart-count-bump' : undefined}
+          >
+            {count}
+          </span>
         </button>
       </header>
       <main>
@@ -272,12 +313,12 @@ export default function App() {
         {tab === 'catalog' && (
           <>
             <section className="hero">
-              <div>
-                <span className="eyebrow">CERCA DE TI. ENTRE NOSOTROS.</span>
+              <div className="hero-copy">
+                <span className="eyebrow">Mercado universitario</span>
                 <h1>
                   Tu comunidad.
                   <br />
-                  Tu próximo hallazgo.
+                  Tu próximo <em>hallazgo.</em>
                 </h1>
                 <p>
                   Encuentra lo que necesitas y comparte lo que tienes.
@@ -285,40 +326,10 @@ export default function App() {
                   El punto de encuentro para comprar en Univalle.
                 </p>
                 <a className="primary" href="#catalogo">
-                  Explorar productos <span>↗</span>
+                  Explorar productos <Icon name="arrow" size={17} />
                 </a>
-                <div className="hero-note">
-                  <span className="tiny-dot" /> Una comunidad, muchas
-                  posibilidades
-                </div>
               </div>
-              <div className="hero-visual" aria-hidden="true">
-                <div className="orbit" />
-                <div className="hero-card">
-                  <span>UnivalleShop</span>
-                  <svg viewBox="0 0 140 140" fill="none">
-                    <path d="M35 50h70l8 70H27l8-70Z" fill="#fff7ed" />
-                    <path
-                      d="M50 53V38a20 20 0 0 1 40 0v15"
-                      stroke="#fff7ed"
-                      strokeWidth="7"
-                    />
-                    <path
-                      d="m52 82 12 12 25-27"
-                      stroke="#b82335"
-                      strokeWidth="6"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <small>DE LA U, PARA TI.</small>
-                </div>
-                <span className="floating-tag tag-one">
-                  ↗ Conexiones que suman
-                </span>
-                <span className="floating-tag tag-two">
-                  ● Comunidad Univalle
-                </span>
-              </div>
+              <FeaturedGallery />
             </section>
             <section id="catalogo" className="catalog-section">
               <div className="section-title">
@@ -334,7 +345,9 @@ export default function App() {
               </div>
               <form className="search-bar" onSubmit={search}>
                 <label className="search-input">
-                  <span aria-hidden="true">⌕</span>
+                  <span aria-hidden="true">
+                    <Icon name="search" />
+                  </span>
                   <input
                     aria-label="Buscar productos"
                     value={query}
@@ -382,7 +395,12 @@ export default function App() {
               ) : products.length ? (
                 <div className="product-grid">
                   {products.map((p) => (
-                    <ProductCard key={p.id} product={p} onAdd={add} />
+                    <ProductCard
+                      key={p.id}
+                      product={p}
+                      onAdd={add}
+                      addedId={added?.productId === p.id ? added.id : undefined}
+                    />
                   ))}
                 </div>
               ) : (
@@ -424,13 +442,20 @@ export default function App() {
                 </div>
                 <div className="product-grid">
                   {recommendations.map((p) => (
-                    <ProductCard key={p.id} product={p} onAdd={add} />
+                    <ProductCard
+                      key={p.id}
+                      product={p}
+                      onAdd={add}
+                      addedId={added?.productId === p.id ? added.id : undefined}
+                    />
                   ))}
                 </div>
               </section>
             )}
             <section className="community-banner">
-              <span className="community-symbol">↗</span>
+              <span className="community-symbol">
+                <Icon name="heart" size={38} />
+              </span>
               <div>
                 <h2>Lo mejor de la U es su gente.</h2>
                 <p>
@@ -590,6 +615,7 @@ export default function App() {
         <p>Proyecto académico · Desarrollo de Software 3</p>
         <small>Demostración: pagos simulados, sin cobros reales.</small>
       </footer>
+      <CartFeedback notice={cartNotice} />
       {drawer && (
         <div
           className="drawer-overlay"

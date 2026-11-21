@@ -1,52 +1,163 @@
-import { useState } from 'react';
-import type { FormEvent } from 'react';
+import { useRef, useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { api, money } from './api';
 import type { Product, Profile } from './api';
+import { catalogPhoto } from './catalogPhotos';
+export type IconName =
+  | 'search'
+  | 'bag'
+  | 'grid'
+  | 'receipt'
+  | 'user'
+  | 'plus'
+  | 'check'
+  | 'arrow'
+  | 'sparkles'
+  | 'heart';
+export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+  const paths: Record<IconName, ReactNode> = {
+    check: <path d="m5 12 4.5 4.5L19 7" />,
+    search: (
+      <>
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-4-4" />
+      </>
+    ),
+    bag: (
+      <>
+        <path d="M5 8h14l1 12H4L5 8Z" />
+        <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+      </>
+    ),
+    grid: (
+      <>
+        <rect x="4" y="4" width="6" height="6" rx="1.5" />
+        <rect x="14" y="4" width="6" height="6" rx="1.5" />
+        <rect x="4" y="14" width="6" height="6" rx="1.5" />
+        <rect x="14" y="14" width="6" height="6" rx="1.5" />
+      </>
+    ),
+    receipt: (
+      <>
+        <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" />
+        <path d="M9 8h6M9 12h6" />
+      </>
+    ),
+    user: (
+      <>
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5 20a7 7 0 0 1 14 0" />
+      </>
+    ),
+    plus: (
+      <>
+        <path d="M12 5v14M5 12h14" />
+      </>
+    ),
+    arrow: (
+      <>
+        <path d="M5 12h14M13 6l6 6-6 6" />
+      </>
+    ),
+    sparkles: (
+      <>
+        <path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" />
+        <path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z" />
+      </>
+    ),
+    heart: (
+      <path d="M20.8 8.8c0 4.2-8.8 10-8.8 10s-8.8-5.8-8.8-10A4.3 4.3 0 0 1 12 6a4.3 4.3 0 0 1 8.8 2.8Z" />
+    ),
+  };
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {paths[name]}
+    </svg>
+  );
+}
+
 export function ProductCard({
   product,
   onAdd,
+  addedId,
 }: {
   product: Product;
-  onAdd: (p: Product) => void;
+  onAdd: (p: Product, source: HTMLButtonElement) => void;
+  addedId?: number;
 }) {
-  const palette =
-    ['rose', 'sage', 'sand', 'blue'][parseInt(product.id.slice(-2), 16) % 4] ??
-    'rose';
+  const photo = catalogPhoto(product.name);
+  const preview = useRef<HTMLDialogElement>(null);
   return (
     <article className="product-card">
-      <div className={`product-art ${palette}`} aria-hidden="true">
-        <svg viewBox="0 0 120 120" fill="none">
-          <path d="M30 40h60l7 60H23l7-60Z" fill="currentColor" opacity=".25" />
-          <path
-            d="M43 44V33a17 17 0 0 1 34 0v11M30 40h60l7 60H23l7-60Z"
-            stroke="currentColor"
-            strokeWidth="4"
-            strokeLinejoin="round"
-          />
-          <path
-            d="m47 69 10 10 20-22"
-            stroke="currentColor"
-            strokeWidth="4"
-            strokeLinecap="round"
-          />
-        </svg>
+      {photo ? (
+        <>
+          <button
+            type="button"
+            className="product-art photo-trigger"
+            aria-label={`Ampliar foto de ${product.name}`}
+            onClick={() => preview.current?.showModal()}
+          >
+            <img src={photo.src} alt={photo.description} loading="lazy" />
+            <span className="zoom-cue" aria-hidden="true">
+              <Icon name="search" size={16} />
+            </span>
+          </button>
+          <dialog
+            className="photo-dialog"
+            aria-label={`Foto de ${product.name}`}
+            ref={preview}
+            onClick={(event) => {
+              if (event.target === event.currentTarget)
+                preview.current?.close();
+            }}
+          >
+            <div className="photo-view">
+              <div className="photo-heading">
+                <h3>{product.name}</h3>
+                <form method="dialog">
+                  <button aria-label="Cerrar foto" className="close-button">
+                    ×
+                  </button>
+                </form>
+              </div>
+              <img src={photo.src} alt={photo.description} loading="lazy" />
+              <small>Imagen de referencia</small>
+            </div>
+          </dialog>
+        </>
+      ) : (
+        <div className="product-art no-photo">
+          <Icon name="bag" size={32} />
+          <span>Sin fotografía</span>
+        </div>
+      )}
+      <div className="product-info">
         <span className="stock-badge">
           {product.stock > 0 ? `${product.stock} disponibles` : 'Agotado'}
         </span>
-      </div>
-      <div className="product-info">
-        <span className="eyebrow">COMUNIDAD UNIVALLE</span>
         <h3>{product.name}</h3>
         {product.reason && <p className="reason">{product.reason}</p>}
         <div className="product-bottom">
           <strong>{money(product.price)}</strong>
           <button
             aria-label={`Agregar ${product.name}`}
-            className="add-button"
+            className={addedId ? 'add-button is-added' : 'add-button'}
             disabled={!product.stock}
-            onClick={() => onAdd(product)}
+            onClick={(event) => onAdd(product, event.currentTarget)}
           >
-            +
+            <span key={addedId ?? 'ready'}>
+              <Icon name={addedId ? 'check' : 'plus'} size={18} />
+            </span>
           </button>
         </div>
       </div>
