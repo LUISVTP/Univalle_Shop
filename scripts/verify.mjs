@@ -16,7 +16,7 @@ function npm(args, cwd) {
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
-for (const service of ['user-services', 'catalog-service', 'orders-service', 'api-gateway']) {
+for (const service of ['user-services', 'catalog-service', 'orders-service', 'payments-service', 'search-service', 'recommendations-service', 'api-gateway']) {
   const cwd = resolve(root, 'services', service);
   console.log(`\nChecking ${service}`);
   if (process.argv.includes('--install')) npm(['ci'], cwd);
@@ -26,4 +26,7 @@ for (const service of ['user-services', 'catalog-service', 'orders-service', 'ap
   npm(['run', 'lint'], cwd);
   if (service === 'user-services') npm(['run', 'test:e2e'], cwd);
 }
-console.log('\nBuild, typecheck, unit/HTTP tests and lint passed for all services.');
+if (process.argv.includes('--install')) npm(['ci'], resolve(root, 'frontend'));
+npm(['run', 'build'], resolve(root, 'frontend'));
+npm(['test'], resolve(root, 'frontend'));
+console.log('\nBuild, typecheck, unit/HTTP tests and lint passed for seven backend applications and React.');
