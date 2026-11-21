@@ -1,0 +1,552 @@
+{
+  "info": {
+    "name": "UnivalleShop — Entrega 1 completa (patrones)",
+    "description": "Ejecute en orden. Demo local: baseUrl http://localhost:3100. Docker: cambiar baseUrl a http://localhost:3000. Registro genera correo único. Consultas son eventualmente consistentes: reenvíe si devuelve 404; Collection Runner reintenta automáticamente hasta 20 veces. Pedido demostrativo, sin pagos ni reservas de inventario.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3100"
+    },
+    {
+      "key": "demoEmail",
+      "value": ""
+    },
+    {
+      "key": "productId",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    },
+    {
+      "key": "projectionRetries",
+      "value": "0"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 — Salud del Gateway",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Gateway activo', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/health"
+      }
+    },
+    {
+      "name": "02 — Registrar usuario (201)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "const u = pm.response.json();",
+              "pm.test('Usuario identificado', () => pm.expect(u.id).to.be.a('string'));",
+              "pm.test('Sin contraseña ni hash', () => { pm.expect(u).not.to.have.property('password'); pm.expect(u).not.to.have.property('passwordHash'); });",
+              "pm.collectionVariables.set('userId', pm.response.json().id);"
+            ]
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('demoEmail', 'demo.' + pm.variables.replaceIn('{{$guid}}') + '@correounivalle.edu.co');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/users",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Estudiante Demo\",\n  \"email\": \"{{demoEmail}}\",\n  \"password\": \"Demo-Univalle-2026!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "03 — Repetir correo (409)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 409', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/users",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Estudiante Demo\",\n  \"email\": \"{{demoEmail}}\",\n  \"password\": \"Demo-Univalle-2026!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "04 — Rechazar correo externo (400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/users",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Estudiante Demo\",\n  \"email\": \"demo@example.com\",\n  \"password\": \"Demo-Univalle-2026!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "05 — Crear producto (201)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('productId', pm.response.json().id);",
+              "pm.test('Producto identificado', () => pm.expect(pm.response.json().id).to.be.a('string'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Libro Desarrollo de Software 3\",\n  \"price\": 15000,\n  \"stock\": 3\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "06 — Listar productos (200)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Incluye el producto creado', () => pm.expect(pm.response.json().map(p => p.id)).to.include(pm.collectionVariables.get('productId')));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/products"
+      }
+    },
+    {
+      "name": "07 — Rechazar precio negativo (400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Producto inválido\",\n  \"price\": -100,\n  \"stock\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "08 — Crear pedido: Chained + Event Sourcing + Outbox",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 202', () => pm.response.to.have.status(202));",
+              "pm.collectionVariables.set('orderId', pm.response.json().id);",
+              "pm.test('Versión inicial',()=>pm.expect(pm.response.json().version).to.eql(1));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/orders",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 2\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "09 — Consultar proyección CQRS",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "setTimeout(() => {}, 1000);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const waiting = pm.response.code === 404;",
+              "const retries = Number(pm.collectionVariables.get('projectionRetries') || 0);",
+              "if (waiting && retries < 20) { pm.collectionVariables.set('projectionRetries', String(retries + 1)); pm.execution.setNextRequest(pm.info.requestId); } else {",
+              "pm.collectionVariables.set('projectionRetries', '0');",
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Estado creado',()=>pm.expect(pm.response.json().status).to.eql('created'));",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/orders/{{orderId}}"
+      }
+    },
+    {
+      "name": "10 — Aggregator: pedido + usuario + producto",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const b=pm.response.json(); pm.test('Tres recursos',()=>{pm.expect(b).to.have.property('order');pm.expect(b).to.have.property('user');pm.expect(b).to.have.property('product');});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/orders/{{orderId}}/summary"
+      }
+    },
+    {
+      "name": "11 — Historial de eventos",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('OrderCreated',()=>pm.expect(pm.response.json()[0].type).to.eql('OrderCreated'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/orders/{{orderId}}/events"
+      }
+    },
+    {
+      "name": "12 — Consumidor independiente en catálogo",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "setTimeout(() => {}, 1000);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const waiting = pm.response.code === 200 && pm.response.json().activeQuantity < 2;",
+              "const retries = Number(pm.collectionVariables.get('projectionRetries') || 0);",
+              "if (waiting && retries < 20) { pm.collectionVariables.set('projectionRetries', String(retries + 1)); pm.execution.setNextRequest(pm.info.requestId); } else {",
+              "pm.collectionVariables.set('projectionRetries', '0');",
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Actividad recibida',()=>pm.expect(pm.response.json().activeQuantity).to.be.at.least(2));",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/products/{{productId}}/activity"
+      }
+    },
+    {
+      "name": "13 — Cancelar: nuevo evento",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 202', () => pm.response.to.have.status(202));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/orders/{{orderId}}/cancel",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Demostración de event sourcing\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "14 — Consultar cancelación proyectada",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "setTimeout(() => {}, 1000);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const waiting = pm.response.code === 404 || (pm.response.code === 200 && pm.response.json().status !== 'cancelled');",
+              "const retries = Number(pm.collectionVariables.get('projectionRetries') || 0);",
+              "if (waiting && retries < 20) { pm.collectionVariables.set('projectionRetries', String(retries + 1)); pm.execution.setNextRequest(pm.info.requestId); } else {",
+              "pm.collectionVariables.set('projectionRetries', '0');",
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Cancelado, versión 2',()=>{pm.expect(pm.response.json().status).to.eql('cancelled');pm.expect(pm.response.json().version).to.eql(2);});",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/orders/{{orderId}}"
+      }
+    },
+    {
+      "name": "15 — Historial conserva creación y cancelación",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Dos hechos',()=>pm.expect(pm.response.json().map(e=>e.type)).to.eql(['OrderCreated','OrderCancelled']));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/orders/{{orderId}}/events"
+      }
+    },
+    {
+      "name": "16 — Reconstruir proyección desde historial",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Reconstrucción cancelada',()=>pm.expect(pm.response.json().status).to.eql('cancelled'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/orders/{{orderId}}/rebuild",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "17 — Rechazar cantidad inválida",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/orders",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 0\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

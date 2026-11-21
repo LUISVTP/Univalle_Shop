@@ -1,0 +1,129 @@
+name: univalleshop
+services:
+  users-mongo:
+    image: mongo:8.0
+    volumes: [users-data:/data/db]
+    networks: [users-db]
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "quit(db.adminCommand('ping').ok ? 0 : 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  catalog-mongo:
+    image: mongo:8.0
+    volumes: [catalog-data:/data/db]
+    networks: [catalog-db]
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "quit(db.adminCommand('ping').ok ? 0 : 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  users:
+    build: ./services/user-services
+    environment:
+      PORT: 3000
+      MONGODB_URI: mongodb://users-mongo:27017/users
+      ALLOWED_EMAIL_DOMAIN: ${ALLOWED_EMAIL_DOMAIN:-correounivalle.edu.co}
+    networks: [backend, users-db]
+    depends_on:
+      users-mongo: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+  catalog:
+    build: ./services/catalog-service
+    environment:
+      PORT: 3000
+      MONGODB_URI: mongodb://catalog-mongo:27017/catalog
+      EVENTS_ENABLED: 'true'
+      EVENT_TRANSPORT: kafka
+      KAFKA_BROKERS: kafka:9092
+    networks: [backend, catalog-db]
+    depends_on:
+      catalog-mongo: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+  orders-mongo:
+    image: mongo:8.0
+    volumes: [orders-data:/data/db]
+    networks: [orders-db]
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "quit(db.adminCommand('ping').ok ? 0 : 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  orders:
+    build: ./services/orders-service
+    environment:
+      PORT: 3000
+      MONGODB_URI: mongodb://orders-mongo:27017/orders
+      USERS_SERVICE_URL: http://users:3000
+      CATALOG_SERVICE_URL: http://catalog:3000
+      EVENT_TRANSPORT: kafka
+      KAFKA_BROKERS: kafka:9092
+    networks: [backend, orders-db]
+    depends_on:
+      orders-mongo: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+  kafka:
+    image: apache/kafka:3.9.1
+    ports: ["127.0.0.1:19092:19092"]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,EXTERNAL://:19092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://127.0.0.1:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes: [kafka-data:/var/lib/kafka/data]
+    networks: [backend]
+    healthcheck:
+      test: [CMD, /opt/kafka/bin/kafka-topics.sh, --bootstrap-server, localhost:9092, --list]
+      interval: 10s
+      timeout: 8s
+      retries: 20
+  gateway:
+    build: ./services/api-gateway
+    ports: ["127.0.0.1:3000:3000"]
+    environment:
+      PORT: 3000
+      USERS_SERVICE_URL: http://users:3000
+      CATALOG_SERVICE_URL: http://catalog:3000
+      ORDERS_SERVICE_URL: http://orders:3000
+    networks: [backend]
+    depends_on:
+      users: { condition: service_healthy }
+      catalog: { condition: service_healthy }
+      orders: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 10
+volumes:
+  users-data:
+  catalog-data:
+  orders-data:
+  kafka-data:
+networks:
+  backend:
+  users-db: { internal: true }
+  catalog-db: { internal: true }
+  orders-db: { internal: true }

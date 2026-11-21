@@ -1,0 +1,31 @@
+# Alternativa de transporte: docker compose -f compose.yaml -f compose.rabbitmq.yaml up --build -d --wait
+services:
+  kafka:
+    profiles: [unused-kafka]
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Defina RABBITMQ_USER en .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Defina RABBITMQ_PASSWORD en .env}
+    ports: ["127.0.0.1:5672:5672", "127.0.0.1:15672:15672"]
+    volumes: [rabbitmq-data:/var/lib/rabbitmq]
+    networks: [backend]
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  orders:
+    environment:
+      EVENT_TRANSPORT: rabbitmq
+      AMQP_HOST: rabbitmq
+      AMQP_USER: ${RABBITMQ_USER:?Defina RABBITMQ_USER en .env}
+      AMQP_PASSWORD: ${RABBITMQ_PASSWORD:?Defina RABBITMQ_PASSWORD en .env}
+  catalog:
+    environment:
+      EVENT_TRANSPORT: rabbitmq
+      AMQP_HOST: rabbitmq
+      AMQP_USER: ${RABBITMQ_USER:?Defina RABBITMQ_USER en .env}
+      AMQP_PASSWORD: ${RABBITMQ_PASSWORD:?Defina RABBITMQ_PASSWORD en .env}
+volumes:
+  rabbitmq-data:
